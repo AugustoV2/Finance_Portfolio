@@ -48,8 +48,7 @@ We use the [`yahoo-finance2`](https://www.npmjs.com/package/yahoo-finance2) npm 
 
 ## 🧑‍💻 Author
 
-- **Augusto Varghese**
-- [Your GitHub](https://github.com/augustov2)
+- **Augusto Varghese**(https://github.com/augustov2)
 
 ## 📝 License
 
