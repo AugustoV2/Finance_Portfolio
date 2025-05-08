@@ -2,8 +2,6 @@
 
 import { useState } from "react"
 import type { Stock } from "@/lib/types"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent } from "@/components/ui/card"
 import {
   PieChart,
   Pie,
@@ -16,9 +14,7 @@ import {
   YAxis,
   CartesianGrid,
   Legend,
-  Sector,
 } from "recharts"
-import { motion } from "framer-motion"
 
 interface PortfolioChartProps {
   data: Stock[]
@@ -32,19 +28,79 @@ const COLORS = [
   "#ef4444", // red-500
   "#3b82f6", // blue-500
   "#f59e0b", // amber-500
-  "#ec4899", // pink-500
-  "#14b8a6", // teal-500
-  "#6366f1", // indigo-500
 ]
 
+const renderCustomizedLabel = ({
+  cx,
+  cy,
+  midAngle,
+  innerRadius,
+  outerRadius,
+  percent,
+  index,
+  name,
+}: any) => {
+  const RADIAN = Math.PI / 180
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5
+  const x = cx + radius * Math.cos(-midAngle * RADIAN)
+  const y = cy + radius * Math.sin(-midAngle * RADIAN)
+
+  return (
+    <text
+      x={x}
+      y={y}
+      fill="white"
+      textAnchor="middle"
+      dominantBaseline="central"
+      className="text-xs font-medium"
+    >
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
+  )
+}
+
+const CustomTooltip = ({ active, payload, label, chartType }: any) => {
+  if (active && payload && payload.length) {
+    if (chartType === "allocation") {
+      return (
+        <div className="bg-white p-4 shadow-lg rounded-lg border border-gray-200">
+          <p className="font-bold">{payload[0].payload.name}</p>
+          <p className="text-sm">
+            Allocation: <span className="font-semibold">{payload[0].value.toFixed(2)}%</span>
+          </p>
+        </div>
+      )
+    } else {
+      return (
+        <div className="bg-white p-4 shadow-lg rounded-lg border border-gray-200">
+          <p className="font-bold">{payload[0].payload.name}</p>
+          <p className="text-sm">
+            Investment: <span className="font-semibold">₹{payload[0].payload.investment.toLocaleString()}</span>
+          </p>
+          <p className="text-sm">
+            Current Value: <span className="font-semibold">₹{payload[0].payload.currentValue.toLocaleString()}</span>
+          </p>
+          <p className="text-sm">
+            P/L:{" "}
+            <span className={`font-semibold ${payload[0].payload.gainLoss >= 0 ? "text-green-500" : "text-red-500"}`}>
+              ₹{payload[0].payload.gainLoss.toLocaleString()}
+            </span>
+          </p>
+        </div>
+      )
+    }
+  }
+  return null
+}
+
 export function PortfolioChart({ data }: PortfolioChartProps) {
-  const [chartType, setChartType] = useState<"allocation" | "performance" | "sector">("allocation")
-  const [activeIndex, setActiveIndex] = useState(0)
+  const [chartType, setChartType] = useState<"allocation" | "performance">("allocation")
 
   // Prepare data for allocation chart (pie chart)
   const allocationData = data.map((stock) => ({
     name: stock.name,
     value: stock.portfolioPercentage,
+    color: COLORS[data.indexOf(stock) % COLORS.length],
   }))
 
   // Prepare data for performance chart (bar chart)
@@ -53,267 +109,132 @@ export function PortfolioChart({ data }: PortfolioChartProps) {
     investment: stock.investment,
     currentValue: stock.presentValue,
     gainLoss: stock.gainLoss,
+    color: COLORS[data.indexOf(stock) % COLORS.length],
   }))
 
-  // Prepare data for sector chart (pie chart)
-  const sectorData = data.reduce(
-    (acc, stock) => {
-      const existingSector = acc.find((item) => item.name === stock.sector)
-      if (existingSector) {
-        existingSector.value += stock.investment
-      } else {
-        acc.push({
-          name: stock.sector,
-          value: stock.investment,
-        })
-      }
-      return acc
-    },
-    [] as { name: string; value: number }[],
-  )
-
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      if (chartType === "allocation") {
-        return (
-          <div className="bg-white dark:bg-gray-800 p-3 border rounded-lg shadow-lg">
-            <p className="font-medium text-gray-900 dark:text-gray-100">{payload[0].name}</p>
-            <p className="text-gray-600 dark:text-gray-300">{`${payload[0].value.toFixed(2)}%`}</p>
-          </div>
-        )
-      } else if (chartType === "sector") {
-        const totalInvestment = data.reduce((sum, stock) => sum + stock.investment, 0)
-        const percentage = (payload[0].value / totalInvestment) * 100
-        return (
-          <div className="bg-white dark:bg-gray-800 p-3 border rounded-lg shadow-lg">
-            <p className="font-medium text-gray-900 dark:text-gray-100">{payload[0].name}</p>
-            <p className="text-gray-600 dark:text-gray-300">{`${new Intl.NumberFormat("en-IN", {
-              style: "currency",
-              currency: "INR",
-              maximumFractionDigits: 0,
-            }).format(payload[0].value)}`}</p>
-            <p className="text-gray-600 dark:text-gray-300">{`${percentage.toFixed(2)}% of portfolio`}</p>
-          </div>
-        )
-      } else {
-        return (
-          <div className="bg-white dark:bg-gray-800 p-3 border rounded-lg shadow-lg">
-            <p className="font-medium text-gray-900 dark:text-gray-100">{payload[0].payload.name}</p>
-            <p className="text-gray-600 dark:text-gray-300">{`Investment: ${new Intl.NumberFormat("en-IN", {
-              style: "currency",
-              currency: "INR",
-            }).format(payload[0].value)}`}</p>
-            <p className="text-gray-600 dark:text-gray-300">{`Current Value: ${new Intl.NumberFormat("en-IN", {
-              style: "currency",
-              currency: "INR",
-            }).format(payload[1].value)}`}</p>
-            <p
-              className={`font-medium ${payload[2].value >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
-            >
-              {`Gain/Loss: ${new Intl.NumberFormat("en-IN", {
-                style: "currency",
-                currency: "INR",
-              }).format(payload[2].value)}`}
-            </p>
-          </div>
-        )
-      }
-    }
-    return null
-  }
-
-  const onPieEnter = (_: any, index: number) => {
-    setActiveIndex(index)
-  }
-
-  const renderActiveShape = (props: any) => {
-    const RADIAN = Math.PI / 180
-    const { cx, cy, midAngle, innerRadius, outerRadius, startAngle, endAngle, fill, payload, percent, value } = props
-    const sin = Math.sin(-RADIAN * midAngle)
-    const cos = Math.cos(-RADIAN * midAngle)
-    const sx = cx + (outerRadius + 10) * cos
-    const sy = cy + (outerRadius + 10) * sin
-    const mx = cx + (outerRadius + 30) * cos
-    const my = cy + (outerRadius + 30) * sin
-    const ex = mx + (cos >= 0 ? 1 : -1) * 22
-    const ey = my
-    const textAnchor = cos >= 0 ? "start" : "end"
-
+  if (data.length === 0) {
     return (
-      <g>
-        <text x={cx} y={cy} dy={8} textAnchor="middle" fill={fill} className="text-sm font-medium">
-          {payload.name}
-        </text>
-        <Sector
-          cx={cx}
-          cy={cy}
-          innerRadius={innerRadius}
-          outerRadius={outerRadius}
-          startAngle={startAngle}
-          endAngle={endAngle}
-          fill={fill}
-        />
-        <Sector
-          cx={cx}
-          cy={cy}
-          startAngle={startAngle}
-          endAngle={endAngle}
-          innerRadius={outerRadius + 6}
-          outerRadius={outerRadius + 10}
-          fill={fill}
-        />
-        <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={fill} fill="none" />
-        <circle cx={ex} cy={ey} r={2} fill={fill} stroke="none" />
-        <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} textAnchor={textAnchor} fill="#333" className="text-xs">
-          {`${(percent * 100).toFixed(2)}%`}
-        </text>
-      </g>
+      <div className="flex items-center justify-center h-64 bg-gray-50 rounded-lg">
+        <p className="text-center text-gray-500">No data available to display charts.</p>
+      </div>
     )
   }
 
   return (
-    <div className="space-y-4">
-      <Tabs value={chartType} onValueChange={(value) => setChartType(value as "allocation" | "performance" | "sector")}>
-        <TabsList className="grid w-full max-w-md grid-cols-3 bg-white/30 dark:bg-gray-800/30 backdrop-blur-sm border border-white/20 dark:border-gray-700/30 p-1 rounded-xl">
-          <TabsTrigger
-            value="allocation"
-            className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:text-primary rounded-lg transition-all duration-300"
-          >
-            Stock Allocation
-          </TabsTrigger>
-          <TabsTrigger
-            value="sector"
-            className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:text-primary rounded-lg transition-all duration-300"
-          >
-            Sector Allocation
-          </TabsTrigger>
-          <TabsTrigger
-            value="performance"
-            className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:text-primary rounded-lg transition-all duration-300"
-          >
-            Performance
-          </TabsTrigger>
-        </TabsList>
-
-        <motion.div
-          key={chartType}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.3 }}
+    <div className="space-y-6 bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+      <div className="flex justify-center space-x-4">
+        <button
+          onClick={() => setChartType("allocation")}
+          className={`px-4 py-2 rounded-lg transition-all duration-200 ${
+            chartType === "allocation"
+              ? "bg-indigo-600 text-white shadow-md"
+              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+          }`}
         >
-          <TabsContent value="allocation" className="mt-4">
-            <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-white/20 dark:border-gray-700/30 shadow-lg">
-              <CardContent className="p-6">
-                <div className="h-[400px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        activeIndex={activeIndex}
-                        activeShape={renderActiveShape}
-                        data={allocationData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={100}
-                        fill="#8884d8"
-                        dataKey="value"
-                        onMouseEnter={onPieEnter}
-                        animationBegin={0}
-                        animationDuration={1000}
-                      >
-                        {allocationData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<CustomTooltip />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+          Allocation
+        </button>
+        <button
+          onClick={() => setChartType("performance")}
+          className={`px-4 py-2 rounded-lg transition-all duration-200 ${
+            chartType === "performance"
+              ? "bg-indigo-600 text-white shadow-md"
+              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+          }`}
+        >
+          Performance
+        </button>
+      </div>
 
-          <TabsContent value="sector" className="mt-4">
-            <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-white/20 dark:border-gray-700/30 shadow-lg">
-              <CardContent className="p-6">
-                <div className="h-[400px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        activeIndex={activeIndex}
-                        activeShape={renderActiveShape}
-                        data={sectorData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={100}
-                        fill="#8884d8"
-                        dataKey="value"
-                        onMouseEnter={onPieEnter}
-                        animationBegin={0}
-                        animationDuration={1000}
-                      >
-                        {sectorData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<CustomTooltip />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+      <div className="h-[400px]">
+        {chartType === "allocation" ? (
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={allocationData}
+                cx="50%"
+                cy="50%"
+                innerRadius={80}
+                outerRadius={120}
+                paddingAngle={2}
+                dataKey="value"
+                label={renderCustomizedLabel}
+                labelLine={false}
+              >
+                {allocationData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} stroke="#fff" strokeWidth={1} />
+                ))}
+              </Pie>
+              <Tooltip content={<CustomTooltip chartType="allocation" />} />
+              <Legend
+                layout="horizontal"
+                verticalAlign="bottom"
+                align="center"
+                formatter={(value, entry: any, index) => (
+                  <span className="text-sm text-gray-600">{allocationData[index].name}</span>
+                )}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={performanceData}
+              margin={{
+                top: 20,
+                right: 30,
+                left: 20,
+                bottom: 60, // Extra space for rotated labels
+              }}
+              barCategoryGap="20%"
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis
+                dataKey="name"
+                angle={-45}
+                textAnchor="end"
+                height={60}
+                tick={{ fontSize: 12 }}
+                tickMargin={10}
+              />
+              <YAxis
+                tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`}
+                tick={{ fontSize: 12 }}
+              />
+              <Tooltip content={<CustomTooltip chartType="performance" />} />
+              <Legend
+                layout="horizontal"
+                verticalAlign="top"
+                align="center"
+                wrapperStyle={{ paddingBottom: 20 }}
+              />
+              <Bar
+                dataKey="investment"
+                name="Investment"
+                fill="#8884d8"
+                radius={[4, 4, 0, 0]}
+              />
+              <Bar
+                dataKey="currentValue"
+                name="Current Value"
+                fill="#82ca9d"
+                radius={[4, 4, 0, 0]}
+              />
+              <Bar
+                dataKey="gainLoss"
+                name="Profit/Loss"
+                fill="#ffc658"
+                radius={[4, 4, 0, 0]}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
 
-          <TabsContent value="performance" className="mt-4">
-            <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-white/20 dark:border-gray-700/30 shadow-lg">
-              <CardContent className="p-6">
-                <div className="h-[400px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={performanceData}
-                      margin={{
-                        top: 20,
-                        right: 30,
-                        left: 20,
-                        bottom: 5,
-                      }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#ccc" opacity={0.3} />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Legend />
-                      <Bar
-                        dataKey="investment"
-                        name="Investment"
-                        fill="#8884d8"
-                        animationBegin={0}
-                        animationDuration={1000}
-                      />
-                      <Bar
-                        dataKey="currentValue"
-                        name="Current Value"
-                        fill="#82ca9d"
-                        animationBegin={300}
-                        animationDuration={1000}
-                      />
-                      <Bar
-                        dataKey="gainLoss"
-                        name="Gain/Loss"
-                        fill="#ffc658"
-                        animationBegin={600}
-                        animationDuration={1000}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </motion.div>
-      </Tabs>
+      <div className="text-center text-sm text-gray-500">
+        {chartType === "allocation"
+          ? "Portfolio allocation by stock value"
+          : "Investment vs current value with profit/loss"}
+      </div>
     </div>
   )
 }

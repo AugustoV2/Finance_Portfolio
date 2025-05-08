@@ -1,10 +1,8 @@
 "use server"
 import type { Stock, SectorSummary } from "./types"
+import yahooFinance from 'yahoo-finance2'
 
-// Function to fetch portfolio data from Yahoo Finance
 export async function fetchPortfolioData(): Promise<Stock[]> {
-  // This would typically come from a database in a real application
-  // For now, we'll use a predefined list of stocks
   const portfolioStocks = [
     {
       symbol: "RELIANCE.NS",
@@ -58,42 +56,65 @@ export async function fetchPortfolioData(): Promise<Stock[]> {
   ]
 
   try {
-    // Since we're having issues with the Yahoo Finance API, let's create mock data
-    // that simulates what we would get from the API
-    const stocksData = portfolioStocks.map((stock) => {
-      // Generate a random current price that's within ±10% of the purchase price
-      const randomFactor = 0.9 + Math.random() * 0.2 // Between 0.9 and 1.1
-      const currentPrice = stock.purchasePrice * randomFactor
+    // Fetch real-time data for all stocks in parallel
+    const stocksData = await Promise.all(portfolioStocks.map(async (stock) => {
+      try {
+        const quote = await yahooFinance.quote(stock.symbol)
+        
+        const currentPrice = quote.regularMarketPrice || 0
+        const investment = stock.purchasePrice * stock.quantity
+        const presentValue = currentPrice * stock.quantity
+        const gainLoss = presentValue - investment
+        
+        // Calculate day change (assuming regularMarketPreviousClose is available)
+        const dayChange = quote.regularMarketPreviousClose 
+          ? ((currentPrice - quote.regularMarketPreviousClose) / quote.regularMarketPreviousClose) * 100
+          : 0
+        const dayChangeValue = currentPrice - (quote.regularMarketPreviousClose || currentPrice)
 
-      // Calculate investment and current values
-      const investment = stock.purchasePrice * stock.quantity
-      const presentValue = currentPrice * stock.quantity
-      const gainLoss = presentValue - investment
-
-      // Generate a random day change percentage between -3% and +3%
-      const dayChange = Math.random() * 6 - 3 // Between -3 and +3
-      const dayChangeValue = currentPrice * (dayChange / 100)
-
-      return {
-        id: stock.symbol,
-        name: stock.symbol.replace(".NS", "").replace(".BS", ""),
-        symbol: stock.symbol,
-        purchasePrice: stock.purchasePrice,
-        quantity: stock.quantity,
-        investment: investment,
-        exchange: stock.exchange,
-        currentPrice: currentPrice,
-        presentValue: presentValue,
-        gainLoss: gainLoss,
-        peRatio: 15 + Math.random() * 20, // Random P/E between 15 and 35
-        latestEarnings: investment * (0.05 + Math.random() * 0.1), // Random earnings
-        portfolioPercentage: 0, // Will be calculated after all stocks are processed
-        sector: stock.sector,
-        dayChange: dayChange,
-        dayChangeValue: dayChangeValue,
-        currency: "INR",
+        return {
+          id: stock.symbol,
+          name: quote.displayName || quote.shortName || stock.symbol.replace(".NS", "").replace(".BS", ""),
+          symbol: stock.symbol,
+          purchasePrice: stock.purchasePrice,
+          quantity: stock.quantity,
+          investment: investment,
+          exchange: stock.exchange,
+          currentPrice: currentPrice,
+          presentValue: presentValue,
+          gainLoss: gainLoss,
+          peRatio: quote.trailingPE || 0,
+          latestEarnings: quote.trailingPE || 0,
+          portfolioPercentage: 0,
+          sector: stock.sector,
+          dayChange: dayChange,
+          dayChangeValue: dayChangeValue,
+          currency: quote.currency || "INR",
+        }
+      } catch (error) {
+        console.error(`Failed to fetch data for ${stock.symbol}:`, error)
+        // Return fallback data if API fails
+        return {
+          id: stock.symbol,
+          name: stock.symbol.replace(".NS", "").replace(".BS", ""),
+          symbol: stock.symbol,
+          purchasePrice: stock.purchasePrice,
+          quantity: stock.quantity,
+          investment: stock.purchasePrice * stock.quantity,
+          exchange: stock.exchange,
+          currentPrice: stock.purchasePrice,
+          presentValue: stock.purchasePrice * stock.quantity,
+          gainLoss: 0,
+          peRatio: 0,
+          latestEarnings: 0,
+          portfolioPercentage: 0,
+          sector: stock.sector,
+          dayChange: 0,
+          dayChangeValue: 0,
+          currency: "INR",
+        }
       }
-    })
+    }))
 
     // Calculate portfolio percentages
     const totalInvestment = stocksData.reduce((sum, stock) => sum + stock.investment, 0)
@@ -108,10 +129,8 @@ export async function fetchPortfolioData(): Promise<Stock[]> {
   }
 }
 
-// Function to update stock prices with fresh data
 export async function updateStockPrices(): Promise<Stock[]> {
   try {
-    // Fetch fresh data
     return await fetchPortfolioData()
   } catch (error) {
     console.error("Failed to update stock prices:", error)
@@ -119,9 +138,7 @@ export async function updateStockPrices(): Promise<Stock[]> {
   }
 }
 
-// Group stocks by sector and calculate sector summaries
-export function groupStocksBySector(stocks: Stock[]): SectorSummary[] {
-  // Ensure stocks is an array
+export async function groupStocksBySector(stocks: Stock[]): Promise<SectorSummary[]> {
   if (!Array.isArray(stocks)) {
     console.error("Expected stocks to be an array, but got:", typeof stocks)
     return []
@@ -129,7 +146,6 @@ export function groupStocksBySector(stocks: Stock[]): SectorSummary[] {
 
   const sectorMap = new Map<string, Stock[]>()
 
-  // Group stocks by sector
   stocks.forEach((stock) => {
     if (!sectorMap.has(stock.sector)) {
       sectorMap.set(stock.sector, [])
@@ -137,7 +153,6 @@ export function groupStocksBySector(stocks: Stock[]): SectorSummary[] {
     sectorMap.get(stock.sector)!.push(stock)
   })
 
-  // Create sector summaries
   const sectorSummaries: SectorSummary[] = []
 
   sectorMap.forEach((sectorStocks, sector) => {
@@ -154,25 +169,5 @@ export function groupStocksBySector(stocks: Stock[]): SectorSummary[] {
     })
   })
 
-  // Sort sectors by investment amount (descending)
   return sectorSummaries.sort((a, b) => b.totalInvestment - a.totalInvestment)
 }
-
-// This function would be used in a real application to fetch data from Yahoo Finance
-// Currently commented out due to integration issues
-/*
-async function fetchYahooFinanceData(symbol: string) {
-  try {
-    // In a real implementation, we would use the yahoo-finance2 library correctly
-    // For example:
-    // const result = await yahooFinance.quote(symbol)
-    // return result
-    
-    console.log(`Would fetch data for ${symbol} from Yahoo Finance`)
-    return null
-  } catch (error) {
-    console.error(`Error fetching data for ${symbol}:`, error)
-    return null
-  }
-}
-*/
