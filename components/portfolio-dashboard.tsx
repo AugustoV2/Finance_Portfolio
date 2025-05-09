@@ -1,22 +1,37 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card"
 import { PortfolioTable } from "@/components/portfolio-table"
 import { PortfolioSummary } from "@/components/portfolio-summary"
 import { PortfolioChart } from "@/components/portfolio-chart"
-import { fetchPortfolioData, updateStockPrices } from "@/lib/portfolio-service"
+import {
+  fetchPortfolioData,
+  updateStockPrices
+} from "@/lib/portfolio-service"
 import type { Stock } from "@/lib/types"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { RefreshCcw, Clock, TrendingUp, TrendingDown } from "lucide-react"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger
+} from "@/components/ui/tabs"
+import {
+  RefreshCcw,
+  Clock,
+  TrendingUp,
+  TrendingDown
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { StockTicker } from "@/components/stock-ticker"
-import { motion, AnimatePresence } from "framer-motion"
-import confetti from "canvas-confetti"
-import { toast } from "@/components/ui/use-toast"
-import { Toaster } from "@/components/ui/toaster"
+import { motion } from "framer-motion"
 
-// Update interval in milliseconds (15 seconds)
 const UPDATE_INTERVAL = 15000
 
 export function PortfolioDashboard() {
@@ -36,18 +51,6 @@ export function PortfolioDashboard() {
       setLastUpdated(new Date())
       const totalGainLoss = data.reduce((sum, stock) => sum + stock.gainLoss, 0)
       setPreviousGainLoss(totalGainLoss)
-      toast({
-        title: "Data loaded successfully",
-        description: "Portfolio data has been updated with the latest simulated market prices.",
-        variant: "default",
-      })
-    } catch (error) {
-      console.error("Failed to fetch portfolio data:", error)
-      toast({
-        title: "Error loading data",
-        description: "Could not fetch portfolio data. Using cached data if available.",
-        variant: "destructive",
-      })
     } finally {
       setIsLoading(false)
     }
@@ -55,42 +58,14 @@ export function PortfolioDashboard() {
 
   const updateData = async () => {
     if (isUpdating) return
-
     setIsUpdating(true)
     try {
       const updatedData = await updateStockPrices()
-      const newTotalGainLoss = updatedData.reduce((sum, stock) => sum + stock.gainLoss, 0)
-      const previousTotal = previousGainLoss
-
       setPortfolioData(updatedData)
       setLastUpdated(new Date())
       setNextUpdateIn(UPDATE_INTERVAL / 1000)
-
-      if (newTotalGainLoss > previousTotal && newTotalGainLoss > 0 && newTotalGainLoss - previousTotal > 5000) {
-        confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { y: 0.6 },
-        })
-
-        toast({
-          title: "Portfolio Gain!",
-          description: `Your portfolio has gained ${new Intl.NumberFormat("en-IN", {
-            style: "currency",
-            currency: "INR",
-          }).format(newTotalGainLoss - previousTotal)} since last update!`,
-          variant: "default",
-        })
-      }
-
-      setPreviousGainLoss(newTotalGainLoss)
     } catch (error) {
       console.error("Failed to update stock prices:", error)
-      toast({
-        title: "Update failed",
-        description: "Could not update stock prices. Please try again.",
-        variant: "destructive",
-      })
     } finally {
       setIsUpdating(false)
     }
@@ -98,7 +73,6 @@ export function PortfolioDashboard() {
 
   useEffect(() => {
     loadData()
-
     const intervalId = setInterval(updateData, UPDATE_INTERVAL)
     const countdownId = setInterval(() => {
       setNextUpdateIn((prev) => (prev > 0 ? prev - 1 : UPDATE_INTERVAL / 1000))
@@ -124,14 +98,12 @@ export function PortfolioDashboard() {
       transition={{ duration: 0.5 }}
       className="space-y-6"
     >
-      <Toaster />
-
       <div className="bg-white/30 dark:bg-gray-800/30 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-white/20 dark:border-gray-700/30">
         <StockTicker stocks={portfolioData} />
       </div>
 
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
           {lastUpdated && (
             <div className="flex items-center gap-2 bg-white/30 dark:bg-gray-800/30 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border border-white/20 dark:border-gray-700/30">
               <Clock className="h-4 w-4 text-gray-500 dark:text-gray-400" />
@@ -145,17 +117,13 @@ export function PortfolioDashboard() {
               <Clock className="h-4 w-4 text-gray-500 dark:text-gray-400" />
               <motion.div
                 className="absolute inset-0 rounded-full border-2 border-gray-300 dark:border-gray-600"
-                animate={{
-                  scale: [1, 1.1, 1],
-                }}
-                transition={{
-                  duration: 1,
-                  repeat: Number.POSITIVE_INFINITY,
-                  repeatType: "loop",
-                }}
+                animate={{ scale: [1, 1.1, 1] }}
+                transition={{ duration: 1, repeat: Infinity }}
               />
             </div>
-            <span className="text-sm text-gray-600 dark:text-gray-300">Next update in: {nextUpdateIn}s</span>
+            <span className="text-sm text-gray-600 dark:text-gray-300">
+              Next update in: {nextUpdateIn}s
+            </span>
           </div>
 
           <div className="flex items-center gap-2 bg-white/30 dark:bg-gray-800/30 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm border border-white/20 dark:border-gray-700/30">
@@ -165,12 +133,17 @@ export function PortfolioDashboard() {
               <TrendingDown className="h-4 w-4 text-red-500" />
             )}
             <span
-              className={`text-sm font-medium ${isPositiveReturn ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+              className={`text-sm font-medium ${
+                isPositiveReturn
+                  ? "text-green-600 dark:text-green-400"
+                  : "text-red-600 dark:text-red-400"
+              }`}
             >
               {isPositiveReturn ? "Trending Up" : "Trending Down"}
             </span>
           </div>
         </div>
+
         <Button
           onClick={handleRefresh}
           variant="outline"
@@ -201,39 +174,49 @@ export function PortfolioDashboard() {
           </TabsTrigger>
         </TabsList>
 
-        <AnimatePresence mode="wait">
+        <TabsContent value="table" className="mt-4">
           <motion.div
-            key={activeTab}
+            key="table"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.3 }}
           >
-            <TabsContent value="table" className="mt-4">
-              <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-white/20 dark:border-gray-700/30 shadow-xl overflow-hidden">
-                <CardHeader>
-                  <CardTitle>Portfolio Holdings</CardTitle>
-                  <CardDescription>View your current stock holdings and performance metrics</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <PortfolioTable data={portfolioData} isLoading={isLoading} />
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="chart" className="mt-4">
-              <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-white/20 dark:border-gray-700/30 shadow-xl">
-                <CardHeader>
-                  <CardTitle>Portfolio Visualization</CardTitle>
-                  <CardDescription>Visual breakdown of your portfolio allocation and performance</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <PortfolioChart data={portfolioData} />
-                </CardContent>
-              </Card>
-            </TabsContent>
+            <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-white/20 dark:border-gray-700/30 shadow-xl overflow-hidden">
+              <CardHeader>
+                <CardTitle>Portfolio Holdings</CardTitle>
+                <CardDescription>
+                  View your current stock holdings and performance metrics
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <PortfolioTable data={portfolioData} isLoading={isLoading} />
+              </CardContent>
+            </Card>
           </motion.div>
-        </AnimatePresence>
+        </TabsContent>
+
+        <TabsContent value="chart" className="mt-4">
+          <motion.div
+            key="chart"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-white/20 dark:border-gray-700/30 shadow-xl">
+              <CardHeader>
+                <CardTitle>Portfolio Visualization</CardTitle>
+                <CardDescription>
+                  Visual breakdown of your portfolio allocation and performance
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <PortfolioChart data={portfolioData} />
+              </CardContent>
+            </Card>
+          </motion.div>
+        </TabsContent>
       </Tabs>
     </motion.div>
   )
